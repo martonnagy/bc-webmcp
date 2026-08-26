@@ -112,6 +112,69 @@ FactBox pane and make sure **BC WebMCP** is visible. Business Central lazy-loads
 FactBoxes, so WebMCP registration cannot occur while the pane is collapsed or
 the FactBox has not been brought into view.
 
+## Browser setup and testing
+
+WebMCP remains experimental, so use Chrome first to isolate browser and iframe
+behavior, then use ChatGPT's built-in browser to test agent discovery. OpenAI
+currently supports challenge testing in either ChatGPT's in-app browser or
+Chrome with WebMCP enabled through an experimental flag or origin trial. See
+the [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge/).
+
+### Chrome: registration and bridge testing
+
+Use a current Google Chrome build that exposes the WebMCP testing flag. Chrome
+151 on macOS was confirmed to contain the flags below at the time this README
+was written; their names and availability may change while the API is
+experimental.
+
+1. Open `chrome://flags/#enable-webmcp-testing`.
+2. Set **WebMCP for testing** to **Enabled**.
+3. Optionally open `chrome://flags/#devtools-webmcp-support` and enable
+   **WebMCP support in DevTools**.
+4. Relaunch Chrome completely.
+5. Sign in to the Business Central sandbox and open a Customer Card.
+6. Expand the FactBox pane and scroll **BC WebMCP** into view.
+
+The FactBox diagnostic status gives the first result:
+
+- **Unavailable** means `document.modelContext.registerTool` is not exposed in
+  the control-add-in document. Confirm the flag and browser version.
+- **Registered: `bc_get_current_record_primary_key`** means WebMCP exists and
+  registration was permitted in that document; H1 and H2 have passed.
+- **`NotAllowedError`** or **`SecurityError`** indicates that the
+  Business Central-owned iframe lacks the required WebMCP `tools` permission.
+
+For direct inspection, open DevTools, select the control-add-in iframe in the
+Console's JavaScript context selector, and evaluate:
+
+```javascript
+document.modelContext
+```
+
+The experimental flag enables the API; it does not bypass iframe permissions.
+Do not launch Chrome with `--disable-web-security` or similar overrides because
+that would invalidate the architectural test.
+
+### ChatGPT built-in browser: agent discovery
+
+ChatGPT's built-in browser does not need the Chrome flag. In ChatGPT desktop,
+open **Browser settings > Permissions** and ensure **Enable site tools** is on.
+Open Business Central in that built-in browser and sign in again if required;
+it does not necessarily share Chrome's authenticated session.
+
+There is an important current limitation: OpenAI documents that tools provided
+only by embedded content are not currently supported. A Business Central
+control add-in is embedded iframe content, so ChatGPT may fail to discover this
+MVP even when Chrome proves that the tool registered successfully. See
+[Using site tools in the ChatGPT desktop app](https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app).
+
+Use this order when recording the feasibility result:
+
+1. Prove registration and the JavaScript-to-AL-to-JavaScript bridge in Chrome.
+2. Test actual agent discovery in ChatGPT's built-in browser.
+3. If Chrome registration succeeds but ChatGPT discovery fails, record H3 as a
+   browser/embedded-content limitation rather than an AL bridge failure.
+
 Follow [Manual feasibility testing](docs/manual-feasibility-test.md) before
 declaring the architecture GO, CONDITIONAL GO, or NO-GO.
 
