@@ -1,7 +1,6 @@
 (() => {
   "use strict";
 
-  const TOOL_NAME = "bc_get_current_record_primary_key";
   const TIMEOUT_MS = 10_000;
   const pendingCalls = new Map();
 
@@ -9,6 +8,7 @@
   let disposed = false;
   let registrationController;
   let statusElements;
+  let lastDefinitionsJson = "";
 
   function createBridgeError(code, message) {
     const error = new Error(message);
@@ -25,21 +25,35 @@
     panel.className = "bc-webmcp-panel";
     panel.setAttribute("aria-live", "polite");
 
-    const heading = document.createElement("h2");
-    heading.textContent = "BC WebMCP";
-    panel.appendChild(heading);
+    const header = document.createElement("div");
+    header.className = "bc-webmcp-header";
 
-    const feature = createStatusRow("WebMCP", "Checking…");
-    const registration = createStatusRow("Tool", "Not registered");
+    const brand = document.createElement("div");
+    brand.className = "bc-webmcp-brand";
+    const brandMark = document.createElement("span");
+    brandMark.className = "bc-webmcp-brand-mark";
+    brandMark.setAttribute("aria-hidden", "true");
+    const heading = document.createElement("h2");
+    heading.textContent = "WebMCP status";
+    brand.append(brandMark, heading);
+
+    const availability = document.createElement("span");
+    availability.className = "bc-webmcp-badge";
+    availability.textContent = "Checking";
+    availability.dataset.state = "pending";
+
+    header.append(brand, availability);
+
+    const tools = createStatusRow("Tools", "Waiting for Business Central…");
     const latest = createStatusRow("Latest call", "None");
 
-    panel.append(feature.row, registration.row, latest.row);
+    panel.append(header, tools.row, latest.row);
     host.appendChild(panel);
 
     return {
       panel,
-      feature: feature.value,
-      registration: registration.value,
+      availability,
+      tools: tools.value,
       latest: latest.value
     };
   }
@@ -60,23 +74,22 @@
     return { row, value };
   }
 
-  function setFeatureStatus(message, state) {
-    setElementStatus(statusElements.feature, message, state);
+  function setElementStatus(element, message, state) {
+    if (!element) return;
+    element.textContent = message;
+    element.dataset.state = state || "neutral";
   }
 
-  function setRegistrationStatus(message, state) {
-    setElementStatus(statusElements.registration, message, state);
+  function setAvailability(message, state) {
+    setElementStatus(statusElements.availability, message, state);
+  }
+
+  function setToolsStatus(message, state) {
+    setElementStatus(statusElements.tools, message, state);
   }
 
   function setLatestStatus(message, state) {
     setElementStatus(statusElements.latest, message, state);
-  }
-
-  function setElementStatus(element, message, state) {
-    if (!element) return;
-
-    element.textContent = message;
-    element.dataset.state = state || "neutral";
   }
 
   function parseErrorPayload(resultJson) {
@@ -122,12 +135,12 @@
           "TIMEOUT",
           "The Business Central tool call timed out after 10 seconds."
         );
-        setLatestStatus(`${error.name}: ${error.message}`, "error");
+        setLatestStatus(`${pending.toolName}: ${error.message}`, "error");
         pending.reject(error);
       }, TIMEOUT_MS);
 
-      pendingCalls.set(requestId, { resolve, reject, timeoutId });
-      setLatestStatus(`Waiting for Business Central (${requestId})`, "pending");
+      pendingCalls.set(requestId, { resolve, reject, timeoutId, toolName });
+      setLatestStatus(`${toolName}: waiting for Business Central…`, "pending");
 
       try {
         Microsoft.Dynamics.NAV.InvokeExtensibilityMethod(
@@ -143,7 +156,7 @@
               "AL_INVOCATION_FAILED",
               "Business Central rejected the AL invocation."
             );
-            setLatestStatus(`${error.name}: ${error.message}`, "error");
+            setLatestStatus(`${pending.toolName}: ${error.message}`, "error");
             pending.reject(error);
           }
         );
@@ -153,92 +166,100 @@
 
         const message = cause instanceof Error ? cause.message : String(cause);
         const error = createBridgeError("AL_INVOCATION_FAILED", message);
-        setLatestStatus(`${error.name}: ${error.message}`, "error");
+        setLatestStatus(`${pending.toolName}: ${error.message}`, "error");
         pending.reject(error);
       }
     });
   }
 
-  window.CompleteToolCall = function CompleteToolCall(
-    requestId,
-    resultJson,
-    isError
-  ) {
+  window.CompleteToolCall = function CompleteToolCall(requestId, resultJson, isError) {
     const pending = takePendingCall(requestId);
     if (!pending) return;
 
     if (isError) {
       const payload = parseErrorPayload(resultJson);
       const error = createBridgeError(payload.code, payload.message);
-      setLatestStatus(`${error.name}: ${error.message}`, "error");
+      setLatestStatus(`${pending.toolName}: ${payload.message}`, "error");
       pending.reject(error);
       return;
     }
 
-    setLatestStatus(resultJson, "success");
+    setLatestStatus(`${pending.toolName}: completed`, "success");
     pending.resolve(resultJson);
   };
 
-  async function registerTool() {
+  async function registerToolDefinitions(toolDefinitions) {
+    registrationController?.abort();
+    registrationController = new AbortController();
+
+    if (toolDefinitions.length === 0) {
+      setToolsStatus("No tools are available for this context", "neutral");
+      return;
+    }
+
+    setToolsStatus(`Registering ${toolDefinitions.length} tools…`, "pending");
+
+    await Promise.all(
+      toolDefinitions.map((definition) => {
+        const toolName = definition.name;
+        return document.modelContext.registerTool(
+          {
+            ...definition,
+            execute: async (argumentsObject) => {
+              try {
+                const resultJson = await invokeAL(toolName, argumentsObject);
+                return { content: [{ type: "text", text: resultJson }] };
+              } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                setLatestStatus(`${toolName}: ${message}`, "error");
+                throw error;
+              }
+            }
+          },
+          { signal: registrationController.signal }
+        );
+      })
+    );
+
+    if (!disposed) {
+      setToolsStatus(`${toolDefinitions.length} tools registered`, "success");
+    }
+  }
+
+  window.SetToolDefinitions = async function SetToolDefinitions(toolDefinitionsJson) {
+    if (disposed || toolDefinitionsJson === lastDefinitionsJson) return;
+
     if (
       !("modelContext" in document) ||
       !document.modelContext ||
       typeof document.modelContext.registerTool !== "function"
     ) {
-      setFeatureStatus("Unavailable", "error");
-      setRegistrationStatus(
-        "document.modelContext.registerTool is missing",
-        "error"
-      );
+      setAvailability("Unavailable", "error");
+      setToolsStatus("document.modelContext.registerTool is missing", "error");
       return;
     }
 
-    setFeatureStatus("Available", "success");
-    setRegistrationStatus("Registering…", "pending");
-    registrationController = new AbortController();
+    setAvailability("Available", "success");
 
     try {
-      await document.modelContext.registerTool(
-        {
-          name: TOOL_NAME,
-          title: "Get current Business Central record key",
-          description:
-            "Returns the table identity and primary-key fields of the Business Central record currently displayed on the host page. This operation is read-only.",
-          inputSchema: {
-            type: "object",
-            properties: {},
-            additionalProperties: false
-          },
-          annotations: {
-            readOnlyHint: true
-          },
-          execute: async () => {
-            try {
-              const resultJson = await invokeAL(TOOL_NAME, {});
-              return {
-                content: [{ type: "text", text: resultJson }]
-              };
-            } catch (error) {
-              const name = error instanceof Error ? error.name : "TOOL_ERROR";
-              const message = error instanceof Error ? error.message : String(error);
-              setLatestStatus(`${name}: ${message}`, "error");
-              throw error;
-            }
-          }
-        },
-        { signal: registrationController.signal }
-      );
-
-      if (!disposed) {
-        setRegistrationStatus(`Registered: ${TOOL_NAME}`, "success");
+      const definitions = JSON.parse(toolDefinitionsJson);
+      if (!Array.isArray(definitions)) {
+        throw new TypeError("Business Central returned an invalid tool definition list.");
       }
+
+      await registerToolDefinitions(definitions);
+      lastDefinitionsJson = toolDefinitionsJson;
     } catch (error) {
       const name = error instanceof Error ? error.name : "REGISTRATION_ERROR";
       const message = error instanceof Error ? error.message : String(error);
-      setRegistrationStatus(`${name}: ${message}`, "error");
+      setToolsStatus(`${name}: ${message}`, "error");
       console.error("BC WebMCP registration failed", error);
     }
-  }
+  };
+
+  window.SetToolRegistrationError = function SetToolRegistrationError(errorCode, errorMessage) {
+    setToolsStatus(`${errorCode}: ${errorMessage}`, "error");
+  };
 
   function dispose() {
     if (disposed) return;
@@ -264,7 +285,18 @@
     initialized = true;
     statusElements = createDiagnosticPanel();
     window.addEventListener("pagehide", dispose, { once: true });
-    void registerTool();
+
+    if (
+      "modelContext" in document &&
+      document.modelContext &&
+      typeof document.modelContext.registerTool === "function"
+    ) {
+      setAvailability("Available", "success");
+    } else {
+      setAvailability("Unavailable", "error");
+    }
+
+    Microsoft.Dynamics.NAV.InvokeExtensibilityMethod("ControlReady", []);
   }
 
   window.BCWebMCP = Object.freeze({ initialize });

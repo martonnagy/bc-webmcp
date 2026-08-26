@@ -1,4 +1,4 @@
-pageextension 50101 "Customer Card WebMCP" extends "Customer Card"
+pageextension 50114 "Item Card WebMCP" extends "Item Card"
 {
     layout
     {

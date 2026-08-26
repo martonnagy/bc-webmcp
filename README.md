@@ -2,195 +2,131 @@
 
 ![BC WebMCP](logo.png)
 
-BC WebMCP is a source-level feasibility MVP for exposing safe, structured,
-page-contextual tools from Microsoft Dynamics 365 Business Central through the
-experimental WebMCP browser API.
+BC WebMCP exposes safe, structured, page-contextual tools from Microsoft
+Dynamics 365 Business Central through the experimental WebMCP browser API.
 
-The extension adds a FactBox to the standard Customer Card and registers one
-read-only tool:
-
-```text
-bc_get_current_record_primary_key
-```
-
-When invoked, the tool calls AL through a Business Central control add-in and
-returns the primary key of the Customer currently displayed on the card.
+Version 0.2 adds the WebMCP FactBox to the standard Customer, Vendor, and Item
+cards. The FactBox follows the current record, dynamically registers the tools
+supported for its table, and sends each request through Business Central AL so
+normal record permissions remain in force.
 
 ## Status
 
-The source compiles against Business Central 28/runtime 17. It has **not** been
-deployed or tested for WebMCP registration, nested-frame discovery, or live
-agent invocation. See [MVP feasibility result](docs/mvp-feasibility-result.md)
-for the evidence checklist and current `NOT TESTED` status.
+The original Customer primary-key MVP has been verified by the project owner.
+The broadened 0.2 source and its separate AL test extension compile against
+Business Central 28/runtime 17; the complete 0.2 browser acceptance matrix still
+needs to be exercised in a sandbox.
+
+The original [feasibility result](docs/mvp-feasibility-result.md) is retained as
+historical evidence rather than rewritten without its original browser details.
+
+## Built-in tools
+
+| Tool | Arguments | Access |
+|---|---|---|
+| `bc_get_current_record_primary_key` | none | read-only |
+| `bc_get_record_info` | none | read-only |
+| `bc_get_financial_info` | none | read-only |
+| `bc_get_ledger_entries` | optional positive integer `count` | read-only |
+| `bc_get_documents` | required `documentKind`, optional positive integer `count` | read-only |
+| `bc_set_last_accessed_by_webmcp` | none | writes only the WebMCP timestamp |
+
+Every successful response contains a `context` object with the table identity,
+native primary-key position, and structured primary-key fields. Retrieval
+responses also report the requested, applied, and returned counts and whether
+more records exist. Requests above the configured maximum are capped and
+reported rather than rejected.
+
+### Document kinds
+
+Customers support sales documents, vendors support purchase documents, and
+items support both.
+
+- Unposted sales: `salesQuote`, `salesOrder`, `salesInvoice`,
+  `salesCreditMemo`, `salesBlanketOrder`, `salesReturnOrder`.
+- Posted sales: `postedSalesInvoice`, `postedSalesCreditMemo`,
+  `postedSalesShipment`, `postedSalesReturnReceipt`.
+- Unposted purchase: `purchaseQuote`, `purchaseOrder`, `purchaseInvoice`,
+  `purchaseCreditMemo`, `purchaseBlanketOrder`, `purchaseReturnOrder`.
+- Posted purchase: `postedPurchaseInvoice`, `postedPurchaseCreditMemo`,
+  `postedPurchaseReceipt`, `postedPurchaseReturnShipment`.
+
+Customer lookups include both sell-to and bill-to roles. Vendor lookups include
+both buy-from and pay-to roles. Duplicate headers are removed and the matched
+roles are returned. Item lookup starts from matching item lines but returns the
+entire document and identifies the matching line numbers.
+
+## Setup
+
+Open **BC WebMCP Setup** through Tell Me. Setup is per company and is initialized
+on install, upgrade, and company creation.
+
+| Setting | Default |
+|---|---:|
+| Default Ledger Entry Count | 10 |
+| Maximum Ledger Entry Count | 100 |
+| Default Document Count | 10 |
+| Maximum Document Count | 20 |
+
+Assign `BC WEBMCP USER` to users of the FactBox and `BC WEBMCP SETUP` to setup
+administrators. These permission sets cover extension-owned objects only. They
+do not grant read or write access to Customer, Vendor, Item, ledger, or document
+tables.
+
+The timestamp tool sets `Last Accessed by WebMCP` to `CurrentDateTime` using
+`Modify(false)`. It does not invoke the base table's `OnModify` trigger, does not
+touch other fields, and still requires the user to have permission to modify the
+current base record. Read tools never change this timestamp.
 
 ## Architecture
 
 ```text
 Browser agent
-  -> document.modelContext.registerTool()
+  -> dynamically registered document.modelContext tools
   -> JavaScript pending-call map
-  -> Microsoft.Dynamics.NAV.InvokeExtensibilityMethod()
-  -> Customer-bound CardPart AL trigger
-  -> RecordRef/KeyRef/FieldRef serializer
-  -> AL calls CompleteToolCall()
-  -> JavaScript resolves the WebMCP result
+  -> Business Central control add-in event
+  -> generic FactBox RecordId context
+  -> internal BC WebMCP Management dispatcher
+  -> typed Customer / Vendor / Item provider
+  -> JavaScript completion callback
+  -> text-wrapped structured JSON result
 ```
 
-The tool returns text content containing JSON with this logical shape:
+The FactBox is source-table independent. Each host page passes its current
+`RecordId`; tool definitions depend on the table, while execution always
+re-fetches the current database record. The public `BC WebMCP Interface`
+codeunit exposes integration events for other extensions. See
+[Extending BC WebMCP](docs/extending-bc-webmcp.md).
 
-```json
-{
-  "application": "Microsoft Dynamics 365 Business Central",
-  "tableId": 18,
-  "tableName": "Customer",
-  "primaryKeyPosition": "No.='10000'",
-  "primaryKeyFields": [
-    {
-      "fieldNo": 1,
-      "fieldName": "No.",
-      "value": "10000"
-    }
-  ]
-}
-```
+## Build and tests
 
-`primaryKeyPosition` uses Business Central's native `RecordRef.GetPosition`
-format; its exact punctuation can vary. `primaryKeyFields` is the structured
-representation consumers should use.
-
-## Prerequisites
-
-- Business Central online sandbox compatible with application 28/runtime 17.
-- Visual Studio Code with the AL Language extension, or a local AL 17 compiler.
-- Microsoft application symbols in the project's `.alpackages` directory.
-- A company containing at least two Customer records for later live testing.
-- A WebMCP-capable browser or ChatGPT browser surface for later feasibility
-  testing.
-
-## Configure a sandbox
-
-Copy the tenant-neutral example and replace both placeholders locally:
+Compile the production app from the repository root:
 
 ```bash
-cp .vscode/launch.example.json .vscode/launch.json
+scripts/compile-al.sh --project . --out .output/bc-webmcp.app
 ```
 
-`.vscode/launch.json` is ignored so tenant and environment identifiers are not
-committed. In VS Code, run **AL: Download Symbols** to populate `.alpackages`.
-
-## Build
-
-From the repository root:
-
-```bash
-scripts/compile-al.sh
-```
-
-The output is written to `.output/bc-webmcp.app`. The script searches installed
-AL Language extension directories for `elc` or `alc`. Override discovery when
-needed:
+The separate test app uses the `TEST` preprocessor symbol so its source is not
+included in the production package. Build the production app first, place that
+package and the standard symbols in `tests/.alpackages`, then compile:
 
 ```bash
 scripts/compile-al.sh \
-  --compiler /absolute/path/to/alc \
-  --packages /absolute/path/to/.alpackages
+  --project tests \
+  --out tests/.output/bc-webmcp-tests.app
 ```
 
-Package caches and compiled `.app` files are ignored and must not be committed.
+The AL bridge is the preferred validation route when its VS Code session is
+available. Package caches, output apps, and generated XLF files are out of
+source-control scope.
 
-## Install
+## Browser notes
 
-Use either of these sandbox-only routes:
-
-1. In VS Code, run the `BC WebMCP Sandbox` launch configuration to publish the
-   development extension.
-2. Compile the app, open **Extension Management** in the sandbox, and upload
-   `.output/bc-webmcp.app`.
-
-Open the Customer List and then a Customer Card after installation. Expand the
-FactBox pane and make sure **BC WebMCP** is visible. Business Central lazy-loads
-FactBoxes, so WebMCP registration cannot occur while the pane is collapsed or
-the FactBox has not been brought into view.
-
-## Browser setup and testing
-
-WebMCP remains experimental, so use Chrome first to isolate browser and iframe
-behavior, then use ChatGPT's built-in browser to test agent discovery. OpenAI
-currently supports challenge testing in either ChatGPT's in-app browser or
-Chrome with WebMCP enabled through an experimental flag or origin trial. See
-the [OpenAI WebMCP Challenge](https://openai.com/webmcp-challenge/).
-
-### Chrome: registration and bridge testing
-
-Use a current Google Chrome build that exposes the WebMCP testing flag. Chrome
-151 on macOS was confirmed to contain the flags below at the time this README
-was written; their names and availability may change while the API is
-experimental.
-
-1. Open `chrome://flags/#enable-webmcp-testing`.
-2. Set **WebMCP for testing** to **Enabled**.
-3. Optionally open `chrome://flags/#devtools-webmcp-support` and enable
-   **WebMCP support in DevTools**.
-4. Relaunch Chrome completely.
-5. Sign in to the Business Central sandbox and open a Customer Card.
-6. Expand the FactBox pane and scroll **BC WebMCP** into view.
-
-The FactBox diagnostic status gives the first result:
-
-- **Unavailable** means `document.modelContext.registerTool` is not exposed in
-  the control-add-in document. Confirm the flag and browser version.
-- **Registered: `bc_get_current_record_primary_key`** means WebMCP exists and
-  registration was permitted in that document; H1 and H2 have passed.
-- **`NotAllowedError`** or **`SecurityError`** indicates that the
-  Business Central-owned iframe lacks the required WebMCP `tools` permission.
-
-For direct inspection, open DevTools, select the control-add-in iframe in the
-Console's JavaScript context selector, and evaluate:
-
-```javascript
-document.modelContext
-```
-
-The experimental flag enables the API; it does not bypass iframe permissions.
-Do not launch Chrome with `--disable-web-security` or similar overrides because
-that would invalidate the architectural test.
-
-### ChatGPT built-in browser: agent discovery
-
-ChatGPT's built-in browser does not need the Chrome flag. In ChatGPT desktop,
-open **Browser settings > Permissions** and ensure **Enable site tools** is on.
-Open Business Central in that built-in browser and sign in again if required;
-it does not necessarily share Chrome's authenticated session.
-
-There is an important current limitation: OpenAI documents that tools provided
-only by embedded content are not currently supported. A Business Central
-control add-in is embedded iframe content, so ChatGPT may fail to discover this
-MVP even when Chrome proves that the tool registered successfully. See
-[Using site tools in the ChatGPT desktop app](https://help.openai.com/en/articles/20001423-using-site-tools-in-the-chatgpt-desktop-app).
-
-Use this order when recording the feasibility result:
-
-1. Prove registration and the JavaScript-to-AL-to-JavaScript bridge in Chrome.
-2. Test actual agent discovery in ChatGPT's built-in browser.
-3. If Chrome registration succeeds but ChatGPT discovery fails, record H3 as a
-   browser/embedded-content limitation rather than an AL bridge failure.
-
-Follow [Manual feasibility testing](docs/manual-feasibility-test.md) before
-declaring the architecture GO, CONDITIONAL GO, or NO-GO.
-
-## Scope and security
-
-- Exactly one tool with no input fields.
-- Current Customer record only.
-- Read-only; no create, modify, delete, posting, or external network operation.
-- Unknown tool names are rejected in AL.
-- Pending requests are correlated by UUID, time out after ten seconds, and are
-  rejected when the add-in document closes.
-- Missing WebMCP support and registration exceptions remain visible in the
-  FactBox diagnostics.
-
-The detailed design rationale and post-MVP ideas remain in the original
-[project handover](bc_webmcp_project_handover.md).
+Business Central lazy-loads FactBoxes. The FactBox pane must be expanded and BC
+WebMCP brought into view before its control add-in can register tools. WebMCP is
+experimental, and iframe permission or agent-discovery behaviour can change
+independently of this AL extension. The original browser setup and evidence
+procedure remains in [Manual feasibility testing](docs/manual-feasibility-test.md).
 
 ## License
 

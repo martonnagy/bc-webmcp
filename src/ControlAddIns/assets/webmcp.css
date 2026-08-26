@@ -1,37 +1,84 @@
 :root {
   color-scheme: light dark;
   font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --bc-primary: #00b7c3;
+  --bc-secondary: #505c6d;
+  --bc-favorable: #35ab22;
+  --bc-ambiguous: #9f9700;
+  --bc-unfavorable: #eb6965;
+  --bc-subordinate: #a7adb6;
+  --bc-text: #212121;
+  --bc-surface: rgba(255, 255, 255, 0.72);
+  --bc-border: rgba(80, 92, 109, 0.22);
 }
 
 #controlAddIn {
   box-sizing: border-box;
-  min-height: 120px;
-  padding: 8px;
+  min-height: 104px;
+  padding: 6px 8px 8px;
 }
 
 .bc-webmcp-panel {
   box-sizing: border-box;
   display: grid;
-  gap: 8px;
+  gap: 9px;
   width: 100%;
   padding: 10px;
   overflow: hidden;
-  color: CanvasText;
-  background: Canvas;
-  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  border-radius: 4px;
+  color: var(--bc-text);
+  background: var(--bc-surface);
+  border: 1px solid var(--bc-border);
+  border-top: 3px solid var(--bc-primary);
+  border-radius: 3px;
+}
+
+.bc-webmcp-header,
+.bc-webmcp-brand {
+  display: flex;
+  align-items: center;
+}
+
+.bc-webmcp-header {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bc-webmcp-brand {
+  min-width: 0;
+  gap: 7px;
+}
+
+.bc-webmcp-brand-mark {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  background: var(--bc-primary);
+  border-radius: 50%;
 }
 
 .bc-webmcp-panel h2 {
   margin: 0;
-  font-size: 15px;
+  overflow: hidden;
+  font-size: 14px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bc-webmcp-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bc-secondary);
+  background: color-mix(in srgb, var(--bc-subordinate) 20%, transparent);
+  border-radius: 999px;
 }
 
 .bc-webmcp-row {
   display: grid;
-  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
+  gap: 9px;
   align-items: start;
   font-size: 12px;
   line-height: 1.35;
@@ -39,36 +86,52 @@
 
 .bc-webmcp-label {
   font-weight: 600;
+  color: var(--bc-secondary);
 }
 
 .bc-webmcp-value {
   min-width: 0;
   overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 
-.bc-webmcp-value[data-state="success"] {
-  color: #107c10;
+.bc-webmcp-value[data-state="success"],
+.bc-webmcp-badge[data-state="success"] {
+  color: var(--bc-favorable);
 }
 
-.bc-webmcp-value[data-state="pending"] {
-  color: #8a6d00;
+.bc-webmcp-value[data-state="pending"],
+.bc-webmcp-badge[data-state="pending"] {
+  color: var(--bc-ambiguous);
 }
 
-.bc-webmcp-value[data-state="error"] {
-  color: #a4262c;
+.bc-webmcp-value[data-state="error"],
+.bc-webmcp-badge[data-state="error"] {
+  color: var(--bc-unfavorable);
 }
 
 @media (prefers-color-scheme: dark) {
-  .bc-webmcp-value[data-state="success"] {
-    color: #6ccb5f;
+  :root {
+    --bc-text: #f3f2f1;
+    --bc-surface: rgba(32, 31, 30, 0.72);
+    --bc-border: rgba(167, 173, 182, 0.32);
+    --bc-favorable: #67c956;
+    --bc-ambiguous: #d8cf4a;
+    --bc-unfavorable: #f28b87;
   }
 
-  .bc-webmcp-value[data-state="pending"] {
-    color: #f2c94c;
+  .bc-webmcp-label {
+    color: #c8cdd4;
+  }
+}
+
+@media (max-width: 240px) {
+  .bc-webmcp-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
-  .bc-webmcp-value[data-state="error"] {
-    color: #ff8c8c;
+  .bc-webmcp-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 }
