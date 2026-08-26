@@ -2,7 +2,7 @@ page 50100 "BC WebMCP FactBox"
 {
     PageType = CardPart;
     ApplicationArea = All;
-    Caption = 'BC WebMCP';
+    Caption = 'WebMCP';
     InsertAllowed = false;
     ModifyAllowed = false;
     DeleteAllowed = false;
@@ -11,12 +11,21 @@ page 50100 "BC WebMCP FactBox"
     {
         area(Content)
         {
-            field(LastAccessedByWebMCP; LastAccessedDisplay)
+            field(LastAccessedByWebMCP; LastAccessed)
             {
                 ApplicationArea = All;
                 Caption = 'Last Accessed by WebMCP';
                 Editable = false;
                 ToolTip = 'Specifies when the current record was last explicitly marked as accessed through WebMCP.';
+                Visible = LastAccessedVisible;
+            }
+            field(LastAccessedByWebMCPNever; LastAccessedNever)
+            {
+                ApplicationArea = All;
+                Caption = 'Last Accessed by WebMCP';
+                Editable = false;
+                ToolTip = 'Specifies that the current record has never been explicitly marked as accessed through WebMCP.';
+                Visible = LastAccessedNeverVisible;
             }
             usercontrol(WebMCPBridge; "BC WebMCP Bridge")
             {
@@ -75,16 +84,24 @@ page 50100 "BC WebMCP FactBox"
     local procedure RefreshLastAccessed()
     var
         Management: Codeunit "BC WebMCP Management";
-        LastAccessed: DateTime;
     begin
-        LastAccessedDisplay := 'Never';
+        LastAccessed := 0DT;
+        LastAccessedVisible := false;
+        LastAccessedNeverVisible := true;
+        LastAccessedNever := 'Never';
+
         if Management.GetLastAccessed(ContextRecordId, LastAccessed) then
-            if LastAccessed <> 0DT then
-                LastAccessedDisplay := Format(LastAccessed, 0, 9);
+            if LastAccessed <> 0DT then begin
+                LastAccessedVisible := true;
+                LastAccessedNeverVisible := false;
+            end;
     end;
 
     var
         ContextRecordId: RecordId;
-        LastAccessedDisplay: Text;
+        LastAccessed: DateTime;
+        LastAccessedNever: Text;
+        LastAccessedVisible: Boolean;
+        LastAccessedNeverVisible: Boolean;
         BridgeReady: Boolean;
 }

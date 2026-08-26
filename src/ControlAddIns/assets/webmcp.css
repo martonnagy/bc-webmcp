@@ -1,35 +1,52 @@
 :root {
-  color-scheme: light dark;
-  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-  --bc-primary: #00b7c3;
-  --bc-secondary: #505c6d;
-  --bc-favorable: #35ab22;
+  color-scheme: only light;
+  font-family: "Segoe UI", "Segoe UI Web (West European)", -apple-system,
+    BlinkMacSystemFont, sans-serif;
+  --bc-primary: #008489;
+  --bc-label: #5f6b7a;
+  --bc-favorable: #107c10;
   --bc-ambiguous: #9f9700;
-  --bc-unfavorable: #eb6965;
-  --bc-subordinate: #a7adb6;
-  --bc-text: #212121;
-  --bc-surface: rgba(255, 255, 255, 0.72);
-  --bc-border: rgba(80, 92, 109, 0.22);
+  --bc-unfavorable: #a4262c;
+  --bc-subordinate: #8a8886;
+  --bc-text: #242424;
+  --bc-surface: #ffffff;
+  --bc-border: #d1d1d1;
+  --bc-hover: #f3f2f1;
+}
+
+html,
+body {
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  color: var(--bc-text);
+  background: var(--bc-surface);
+  font-family: inherit;
 }
 
 #controlAddIn {
   box-sizing: border-box;
+  height: 100%;
   min-height: 104px;
-  padding: 6px 8px 8px;
+  padding: 4px 12px 10px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  color: var(--bc-text);
+  background: var(--bc-surface);
+  font-family: inherit;
 }
 
 .bc-webmcp-panel {
   box-sizing: border-box;
   display: grid;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  padding: 10px;
-  overflow: hidden;
+  min-width: 0;
+  padding: 5px 0 10px;
   color: var(--bc-text);
   background: var(--bc-surface);
-  border: 1px solid var(--bc-border);
-  border-top: 3px solid var(--bc-primary);
-  border-radius: 3px;
 }
 
 .bc-webmcp-header,
@@ -61,42 +78,127 @@
   overflow: hidden;
   font-size: 14px;
   font-weight: 600;
+  line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bc-webmcp-badge {
   flex: 0 0 auto;
-  padding: 2px 7px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--bc-secondary);
-  background: color-mix(in srgb, var(--bc-subordinate) 20%, transparent);
-  border-radius: 999px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--bc-subordinate);
+  text-align: right;
 }
 
 .bc-webmcp-row {
   display: grid;
-  grid-template-columns: minmax(64px, auto) minmax(0, 1fr);
-  gap: 9px;
-  align-items: start;
-  font-size: 12px;
-  line-height: 1.35;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 60%);
+  gap: 16px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .bc-webmcp-label {
-  font-weight: 600;
-  color: var(--bc-secondary);
+  min-width: 0;
+  color: var(--bc-label);
 }
 
 .bc-webmcp-value {
   min-width: 0;
   overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.bc-webmcp-tools-toggle {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  justify-self: end;
+  max-width: 100%;
+  margin: -2px -4px;
+  padding: 2px 4px;
+  color: var(--bc-text);
+  background: transparent;
+  border: 0;
+  border-radius: 2px;
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.bc-webmcp-tools-toggle:hover:not(:disabled) {
+  background: var(--bc-hover);
+}
+
+.bc-webmcp-tools-toggle:focus-visible {
+  outline: 2px solid var(--bc-primary);
+  outline-offset: 1px;
+}
+
+.bc-webmcp-tools-toggle:disabled {
+  cursor: default;
+}
+
+.bc-webmcp-tools-toggle:disabled .bc-webmcp-info-icon {
+  display: none;
+}
+
+.bc-webmcp-tools-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bc-webmcp-info-icon {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.bc-webmcp-tool-details {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--bc-border);
+}
+
+.bc-webmcp-tool-details[hidden] {
+  display: none;
+}
+
+.bc-webmcp-tool {
+  min-width: 0;
+}
+
+.bc-webmcp-tool-name,
+.bc-webmcp-tool-description {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.bc-webmcp-tool-name {
+  color: var(--bc-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.bc-webmcp-tool-description {
+  margin-top: 2px;
+  color: var(--bc-label);
+  font-size: 12px;
+  line-height: 17px;
 }
 
 .bc-webmcp-value[data-state="success"],
 .bc-webmcp-badge[data-state="success"] {
   color: var(--bc-favorable);
+}
+
+.bc-webmcp-tools-toggle[data-state="success"] {
+  color: var(--bc-primary);
 }
 
 .bc-webmcp-value[data-state="pending"],
@@ -109,29 +211,9 @@
   color: var(--bc-unfavorable);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bc-text: #f3f2f1;
-    --bc-surface: rgba(32, 31, 30, 0.72);
-    --bc-border: rgba(167, 173, 182, 0.32);
-    --bc-favorable: #67c956;
-    --bc-ambiguous: #d8cf4a;
-    --bc-unfavorable: #f28b87;
-  }
-
-  .bc-webmcp-label {
-    color: #c8cdd4;
-  }
-}
-
 @media (max-width: 240px) {
-  .bc-webmcp-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .bc-webmcp-row {
-    grid-template-columns: 1fr;
-    gap: 2px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 58%);
+    gap: 8px;
   }
 }

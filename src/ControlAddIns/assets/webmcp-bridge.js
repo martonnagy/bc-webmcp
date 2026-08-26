@@ -44,18 +44,62 @@
 
     header.append(brand, availability);
 
-    const tools = createStatusRow("Tools", "Waiting for Business Central…");
+    const tools = createToolsStatusRow();
     const latest = createStatusRow("Latest call", "None");
 
-    panel.append(header, tools.row, latest.row);
+    panel.append(header, tools.row, tools.details, latest.row);
     host.appendChild(panel);
 
     return {
       panel,
       availability,
-      tools: tools.value,
+      tools: tools.text,
+      toolsToggle: tools.toggle,
+      toolDetails: tools.details,
       latest: latest.value
     };
+  }
+
+  function createToolsStatusRow() {
+    const row = document.createElement("div");
+    row.className = "bc-webmcp-row";
+
+    const label = document.createElement("span");
+    label.className = "bc-webmcp-label";
+    label.textContent = "Tools";
+
+    const toggle = document.createElement("button");
+    toggle.className = "bc-webmcp-value bc-webmcp-tools-toggle";
+    toggle.type = "button";
+    toggle.disabled = true;
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", "bc-webmcp-tool-details");
+
+    const text = document.createElement("span");
+    text.className = "bc-webmcp-tools-text";
+    text.textContent = "Waiting for Business Central…";
+
+    const infoIcon = document.createElement("span");
+    infoIcon.className = "bc-webmcp-info-icon";
+    infoIcon.textContent = "ⓘ";
+    infoIcon.setAttribute("aria-hidden", "true");
+
+    toggle.append(text, infoIcon);
+    row.append(label, toggle);
+
+    const details = document.createElement("div");
+    details.id = "bc-webmcp-tool-details";
+    details.className = "bc-webmcp-tool-details";
+    details.hidden = true;
+
+    toggle.addEventListener("click", () => {
+      const shouldExpand = details.hidden;
+      details.hidden = !shouldExpand;
+      toggle.setAttribute("aria-expanded", String(shouldExpand));
+      updateToolsToggleLabel();
+    });
+
+    return { row, toggle, text, details };
   }
 
   function createStatusRow(labelText, valueText) {
@@ -86,10 +130,53 @@
 
   function setToolsStatus(message, state) {
     setElementStatus(statusElements.tools, message, state);
+    if (statusElements?.toolsToggle) {
+      statusElements.toolsToggle.dataset.state = state || "neutral";
+      updateToolsToggleLabel();
+    }
   }
 
   function setLatestStatus(message, state) {
     setElementStatus(statusElements.latest, message, state);
+  }
+
+  function updateToolsToggleLabel() {
+    if (!statusElements?.toolsToggle || !statusElements.tools) return;
+
+    const action = statusElements.toolDetails?.hidden ? "Show" : "Hide";
+    statusElements.toolsToggle.setAttribute(
+      "aria-label",
+      `${statusElements.tools.textContent}. ${action} registered tool details.`
+    );
+  }
+
+  function setRegisteredToolDefinitions(toolDefinitions) {
+    const { toolDetails, toolsToggle } = statusElements;
+    toolDetails.replaceChildren();
+    toolDetails.hidden = true;
+    toolsToggle.setAttribute("aria-expanded", "false");
+    toolsToggle.disabled = toolDefinitions.length === 0;
+
+    for (const definition of toolDefinitions) {
+      const tool = document.createElement("article");
+      tool.className = "bc-webmcp-tool";
+
+      const name = document.createElement("h3");
+      name.className = "bc-webmcp-tool-name";
+      name.textContent = definition.name;
+
+      const description = document.createElement("p");
+      description.className = "bc-webmcp-tool-description";
+      description.textContent =
+        typeof definition.description === "string" && definition.description.trim()
+          ? definition.description
+          : "No description is available.";
+
+      tool.append(name, description);
+      toolDetails.appendChild(tool);
+    }
+
+    updateToolsToggleLabel();
   }
 
   function parseErrorPayload(resultJson) {
@@ -191,6 +278,7 @@
   async function registerToolDefinitions(toolDefinitions) {
     registrationController?.abort();
     registrationController = new AbortController();
+    setRegisteredToolDefinitions([]);
 
     if (toolDefinitions.length === 0) {
       setToolsStatus("No tools are available for this context", "neutral");
@@ -222,6 +310,7 @@
     );
 
     if (!disposed) {
+      setRegisteredToolDefinitions(toolDefinitions);
       setToolsStatus(`${toolDefinitions.length} tools registered`, "success");
     }
   }
@@ -235,6 +324,7 @@
       typeof document.modelContext.registerTool !== "function"
     ) {
       setAvailability("Unavailable", "error");
+      setRegisteredToolDefinitions([]);
       setToolsStatus("document.modelContext.registerTool is missing", "error");
       return;
     }
@@ -252,12 +342,14 @@
     } catch (error) {
       const name = error instanceof Error ? error.name : "REGISTRATION_ERROR";
       const message = error instanceof Error ? error.message : String(error);
+      setRegisteredToolDefinitions([]);
       setToolsStatus(`${name}: ${message}`, "error");
       console.error("BC WebMCP registration failed", error);
     }
   };
 
   window.SetToolRegistrationError = function SetToolRegistrationError(errorCode, errorMessage) {
+    setRegisteredToolDefinitions([]);
     setToolsStatus(`${errorCode}: ${errorMessage}`, "error");
   };
 

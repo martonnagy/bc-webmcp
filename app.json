@@ -2,7 +2,7 @@
   "id": "0f370bf6-27d5-4987-887f-408899491dea",
   "name": "BC WebMCP",
   "publisher": "Marton Nagy",
-  "version": "0.3.0.0",
+  "version": "0.4.0.0",
   "brief": "Expose safe, page-contextual Business Central tools through WebMCP.",
   "description": "Expose safe, page-contextual Customer, Vendor, and Item operations through a WebMCP-enabled FactBox.",
   "privacyStatement": "",

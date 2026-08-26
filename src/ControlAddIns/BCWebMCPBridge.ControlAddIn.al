@@ -9,7 +9,7 @@ controladdin "BC WebMCP Bridge"
     HorizontalShrink = true;
     HorizontalStretch = true;
     VerticalShrink = true;
-    VerticalStretch = false;
+    VerticalStretch = true;
 
     event ControlReady();
     event InvokeTool(RequestId: Text; ToolName: Text; ArgumentsJson: Text);
