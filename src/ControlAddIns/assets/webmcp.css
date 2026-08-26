@@ -1,0 +1,74 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#controlAddIn {
+  box-sizing: border-box;
+  min-height: 120px;
+  padding: 8px;
+}
+
+.bc-webmcp-panel {
+  box-sizing: border-box;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  overflow: hidden;
+  color: CanvasText;
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+  border-radius: 4px;
+}
+
+.bc-webmcp-panel h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bc-webmcp-row {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.bc-webmcp-label {
+  font-weight: 600;
+}
+
+.bc-webmcp-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.bc-webmcp-value[data-state="success"] {
+  color: #107c10;
+}
+
+.bc-webmcp-value[data-state="pending"] {
+  color: #8a6d00;
+}
+
+.bc-webmcp-value[data-state="error"] {
+  color: #a4262c;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bc-webmcp-value[data-state="success"] {
+    color: #6ccb5f;
+  }
+
+  .bc-webmcp-value[data-state="pending"] {
+    color: #f2c94c;
+  }
+
+  .bc-webmcp-value[data-state="error"] {
+    color: #ff8c8c;
+  }
+}

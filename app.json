@@ -1,0 +1,33 @@
+{
+  "id": "0f370bf6-27d5-4987-887f-408899491dea",
+  "name": "BC WebMCP",
+  "publisher": "Marton Nagy",
+  "version": "0.1.0.0",
+  "brief": "Expose safe, page-contextual Business Central tools through WebMCP.",
+  "description": "A feasibility MVP that exposes the current Customer record primary key through a WebMCP-enabled FactBox.",
+  "privacyStatement": "",
+  "EULA": "",
+  "help": "",
+  "url": "",
+  "logo": "logo.png",
+  "dependencies": [],
+  "screenshots": [],
+  "platform": "28.0.0.0",
+  "application": "28.0.0.0",
+  "idRanges": [
+    {
+      "from": 50100,
+      "to": 50149
+    }
+  ],
+  "runtime": "17.0",
+  "target": "Cloud",
+  "features": [
+    "NoImplicitWith"
+  ],
+  "resourceExposurePolicy": {
+    "allowDebugging": true,
+    "allowDownloadingSource": true,
+    "includeSourceInSymbolFile": true
+  }
+}
