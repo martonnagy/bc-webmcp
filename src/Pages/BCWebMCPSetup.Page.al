@@ -40,6 +40,20 @@ page 50103 "BC WebMCP Setup"
                     ToolTip = 'Specifies the largest number of document headers a tool call can retrieve.';
                 }
             }
+            group(Lists)
+            {
+                Caption = 'Lists';
+                field(DefaultListCount; Rec."Default List Count")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Specifies the number of rows returned when a list tool call does not supply count.';
+                }
+                field(MaximumListCount; Rec."Maximum List Count")
+                {
+                    ApplicationArea = All;
+                    ToolTip = 'Specifies the largest number of rows a list tool call can retrieve.';
+                }
+            }
         }
     }
 

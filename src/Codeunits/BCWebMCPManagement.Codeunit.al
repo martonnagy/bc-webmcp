@@ -6,9 +6,21 @@ codeunit 50104 "BC WebMCP Management"
     procedure EnsureSetup()
     var
         Setup: Record "BC WebMCP Setup";
+        SetupChanged: Boolean;
     begin
-        if Setup.Get() then
+        if Setup.Get() then begin
+            if Setup."Maximum List Count" = 0 then begin
+                Setup.Validate("Maximum List Count", 100);
+                SetupChanged := true;
+            end;
+            if Setup."Default List Count" = 0 then begin
+                Setup.Validate("Default List Count", 20);
+                SetupChanged := true;
+            end;
+            if SetupChanged then
+                Setup.Modify(true);
             exit;
+        end;
 
         Setup.Init();
         Setup."Primary Key" := '';
@@ -16,6 +28,8 @@ codeunit 50104 "BC WebMCP Management"
         Setup.Validate("Maximum Ledger Entry Count", 100);
         Setup.Validate("Default Document Count", 10);
         Setup.Validate("Maximum Document Count", 20);
+        Setup.Validate("Default List Count", 20);
+        Setup.Validate("Maximum List Count", 100);
         Setup.Insert(true);
     end;
 
@@ -44,6 +58,46 @@ codeunit 50104 "BC WebMCP Management"
         end;
 
         exit(ErrorCode = '');
+    end;
+
+    procedure GetListToolDefinitions(ContextTableId: Integer; var ToolDefinitionsJson: Text; var ErrorCode: Text; var ErrorMessage: Text): Boolean
+    begin
+        Clear(ToolDefinitionsJson);
+        Clear(ErrorCode);
+        Clear(ErrorMessage);
+
+        if ContextTableId = 0 then begin
+            ErrorCode := 'NO_LIST_CONTEXT';
+            ErrorMessage := 'The FactBox has no current Business Central list context.';
+            exit(false);
+        end;
+
+        if not IsBuiltInTable(ContextTableId) then begin
+            ErrorCode := 'UNSUPPORTED_LIST_TABLE';
+            ErrorMessage := 'The current Business Central table does not support list reading through WebMCP.';
+            exit(false);
+        end;
+
+        if not TryBuildListToolDefinitions(ToolDefinitionsJson) then begin
+            ErrorCode := 'TOOL_REGISTRATION_ERROR';
+            ErrorMessage := GetLastErrorText();
+            exit(false);
+        end;
+
+        exit(true);
+    end;
+
+    [TryFunction]
+    local procedure TryBuildListToolDefinitions(var ToolDefinitionsJson: Text)
+    var
+        ToolDefinitions: JsonArray;
+    begin
+        AddCountTool(
+            ToolDefinitions,
+            GetCurrentListToolName(),
+            'Get current Business Central list',
+            'Returns rows in the current page filter and sort order. The response includes totalCount and isLimited. If isLimited is true, disclose that the answer covers only returnedCount of totalCount records and do not present rankings as complete.');
+        ToolDefinitions.WriteTo(ToolDefinitionsJson);
     end;
 
     [TryFunction]
@@ -81,6 +135,63 @@ codeunit 50104 "BC WebMCP Management"
             if UnhandledErrorMessage = '' then
                 UnhandledErrorMessage := 'Business Central could not complete the requested operation.';
             BuildErrorJson(GetUnhandledErrorCode(UnhandledErrorMessage), UnhandledErrorMessage, ResultJson);
+            IsError := true;
+        end;
+    end;
+
+    procedure ExecuteListTool(ContextTableId: Integer; ContextView: Text; ToolName: Text; ArgumentsJson: Text; var ResultJson: Text; var IsError: Boolean)
+    var
+        UnhandledErrorMessage: Text;
+    begin
+        Clear(ResultJson);
+        IsError := false;
+
+        if not TryExecuteListTool(ContextTableId, ContextView, ToolName, ArgumentsJson, ResultJson, IsError) then begin
+            UnhandledErrorMessage := GetLastErrorText();
+            if UnhandledErrorMessage = '' then
+                UnhandledErrorMessage := 'Business Central could not complete the requested list operation.';
+            BuildErrorJson(GetUnhandledErrorCode(UnhandledErrorMessage), UnhandledErrorMessage, ResultJson);
+            IsError := true;
+        end;
+    end;
+
+    [TryFunction]
+    local procedure TryExecuteListTool(ContextTableId: Integer; ContextView: Text; ToolName: Text; ArgumentsJson: Text; var ResultJson: Text; var IsError: Boolean)
+    var
+        ListProvider: Codeunit "BC WebMCP List Provider";
+        Arguments: JsonObject;
+        ErrorCode: Text;
+        ErrorMessage: Text;
+    begin
+        if ContextTableId = 0 then begin
+            BuildErrorJson('NO_LIST_CONTEXT', 'The FactBox has no current Business Central list context.', ResultJson);
+            IsError := true;
+            exit;
+        end;
+
+        if not IsBuiltInTable(ContextTableId) then begin
+            BuildErrorJson('UNSUPPORTED_LIST_TABLE', 'The current Business Central table does not support list reading through WebMCP.', ResultJson);
+            IsError := true;
+            exit;
+        end;
+
+        if ArgumentsJson = '' then
+            ArgumentsJson := '{}';
+        if not Arguments.ReadFrom(ArgumentsJson) then begin
+            BuildErrorJson('INVALID_ARGUMENTS', 'The tool arguments are not a valid JSON object.', ResultJson);
+            IsError := true;
+            exit;
+        end;
+
+        if ToolName <> GetCurrentListToolName() then begin
+            BuildErrorJson('UNKNOWN_TOOL', 'The requested WebMCP tool is not supported for the current list.', ResultJson);
+            IsError := true;
+            exit;
+        end;
+
+        ListProvider.Execute(ContextTableId, ContextView, Arguments, ResultJson, ErrorCode, ErrorMessage);
+        if ErrorCode <> '' then begin
+            BuildErrorJson(ErrorCode, ErrorMessage, ResultJson);
             IsError := true;
         end;
     end;
@@ -206,7 +317,10 @@ codeunit 50104 "BC WebMCP Management"
                 ErrorMessage := 'count must be a positive integer.';
                 exit(false);
             end;
-            RequestedCount := CountToken.AsValue().AsInteger();
+            if not TryGetInteger(CountToken, RequestedCount) then begin
+                ErrorMessage := 'count must be a positive integer.';
+                exit(false);
+            end;
             if RequestedCount <= 0 then begin
                 ErrorMessage := 'count must be a positive integer.';
                 exit(false);
@@ -217,6 +331,12 @@ codeunit 50104 "BC WebMCP Management"
         if AppliedCount > MaximumCount then
             AppliedCount := MaximumCount;
         exit(true);
+    end;
+
+    [TryFunction]
+    local procedure TryGetInteger(Token: JsonToken; var Value: Integer)
+    begin
+        Value := Token.AsValue().AsInteger();
     end;
 
     procedure AddRecordContext(RecordReference: RecordRef; var Result: JsonObject)
@@ -257,6 +377,29 @@ codeunit 50104 "BC WebMCP Management"
         Result.Add('hasMore', HasMore);
     end;
 
+    procedure AddListCountMetadata(var Result: JsonObject; RequestedCount: Integer; UsedDefault: Boolean; AppliedCount: Integer; ReturnedCount: Integer; TotalCount: Integer)
+    var
+        IsLimited: Boolean;
+    begin
+        IsLimited := ReturnedCount < TotalCount;
+        AddCountMetadata(Result, RequestedCount, UsedDefault, AppliedCount, ReturnedCount, IsLimited);
+        Result.Add('totalCount', TotalCount);
+        Result.Add('isLimited', IsLimited);
+    end;
+
+    procedure AddListContext(TableId: Integer; PageView: Text; var Result: JsonObject)
+    var
+        RecordReference: RecordRef;
+        Context: JsonObject;
+    begin
+        RecordReference.Open(TableId);
+        Context.Add('contextType', 'list');
+        Context.Add('tableId', TableId);
+        Context.Add('tableName', RecordReference.Name());
+        Context.Add('pageView', PageView);
+        Result.Add('context', Context);
+    end;
+
     procedure GetPrimaryKeyToolName(): Text
     begin
         exit('bc_get_current_record_primary_key');
@@ -285,6 +428,11 @@ codeunit 50104 "BC WebMCP Management"
     procedure GetSetLastAccessedToolName(): Text
     begin
         exit('bc_set_last_accessed_by_webmcp');
+    end;
+
+    procedure GetCurrentListToolName(): Text
+    begin
+        exit('bc_get_current_list');
     end;
 
     local procedure IsBuiltInTable(TableId: Integer): Boolean

@@ -33,6 +33,38 @@ pageextension 70000 "Resource Card WebMCP" extends "Resource Card"
 The generic primary-key tool is automatically available for any persisted
 record. A new or deleted record produces a structured context error.
 
+## Host the FactBox on another supported list page
+
+The list operation is built in for Customer, Vendor, and Item. A page extension
+for another list over one of those tables can pass the table identity and the
+current language-independent view:
+
+```al
+pageextension 70001 "Customer Lookup WebMCP" extends "Customer Lookup"
+{
+    layout
+    {
+        addlast(FactBoxes)
+        {
+            part(BCWebMCP; "BC WebMCP FactBox")
+            {
+                ApplicationArea = All;
+            }
+        }
+    }
+
+    trigger OnAfterGetCurrRecord()
+    begin
+        CurrPage.BCWebMCP.Page.SetListContext(Database::Customer, Rec.GetView(false));
+    end;
+}
+```
+
+The list FactBox registers only `bc_get_current_list`. The result follows the
+captured filters and ordering and reports the exact `totalCount`, how many rows
+were returned, and whether the response is limited. List operations for other
+tables are not part of the public event contract in version 0.5.
+
 ## Register a table-specific tool
 
 Subscribe to `BC WebMCP Interface.OnDiscoverTools`. Tool names must be unique

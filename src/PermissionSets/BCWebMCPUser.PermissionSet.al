@@ -11,6 +11,7 @@ permissionset 50118 "BC WEBMCP USER"
         codeunit "BC WebMCP Customer Provider" = X,
         codeunit "BC WebMCP Vendor Provider" = X,
         codeunit "BC WebMCP Item Provider" = X,
+        codeunit "BC WebMCP List Provider" = X,
         codeunit "BC WebMCP Document Provider" = X,
         codeunit "BC WebMCP Data Helper" = X,
         codeunit "BC WebMCP Doc. Serializer" = X,

@@ -5,17 +5,18 @@
 BC WebMCP exposes safe, structured, page-contextual tools from Microsoft
 Dynamics 365 Business Central through the experimental WebMCP browser API.
 
-Version 0.2 adds the WebMCP FactBox to the standard Customer, Vendor, and Item
-cards. The FactBox follows the current record, dynamically registers the tools
-supported for its table, and sends each request through Business Central AL so
-normal record permissions remain in force.
+Version 0.5 adds the WebMCP FactBox to the standard Customer, Vendor, and Item
+cards and lists. Card FactBoxes follow the current record. List FactBoxes expose
+one read-only operation that follows the page's current filters and sort order.
+Every request is sent through Business Central AL so normal record permissions
+remain in force.
 
 ## Status
 
 The original Customer primary-key MVP has been verified by the project owner.
-The broadened 0.2 source and its separate AL test extension compile against
-Business Central 28/runtime 17; the complete 0.2 browser acceptance matrix still
-needs to be exercised in a sandbox.
+The 0.5 source and its separate AL test extension compile against Business
+Central 28/runtime 17; the complete browser acceptance matrix still needs to be
+exercised in a sandbox.
 
 The original [feasibility result](docs/mvp-feasibility-result.md) is retained as
 historical evidence rather than rewritten without its original browser details.
@@ -30,12 +31,21 @@ historical evidence rather than rewritten without its original browser details.
 | `bc_get_ledger_entries` | optional positive integer `count` | read-only |
 | `bc_get_documents` | required `documentKind`, optional positive integer `count` | read-only |
 | `bc_set_last_accessed_by_webmcp` | none | writes only the WebMCP timestamp |
+| `bc_get_current_list` | optional positive integer `count` | read-only; list pages only |
 
-Every successful response contains a `context` object with the table identity,
-native primary-key position, and structured primary-key fields. Retrieval
-responses also report the requested, applied, and returned counts and whether
-more records exist. Requests above the configured maximum are capped and
-reported rather than rejected.
+Every successful card response contains a `context` object with the table
+identity, native primary-key position, and structured primary-key fields.
+Retrieval responses also report the requested, applied, and returned counts and
+whether more records exist. Requests above the configured maximum are capped
+and reported rather than rejected.
+
+On the standard Customer, Vendor, and Item lists, `bc_get_current_list` is the
+only registered tool. It returns rows in the page's current filter, key, and
+sort order. List responses include `totalCount`, `returnedCount`, `isLimited`,
+and `hasMore`. When `isLimited` is true, the result is only a partial view and
+must not be presented as a complete ranking. Customer rows include sales and
+balance facts, vendor rows include purchases and balance facts, and item rows
+include inventory, order quantities, price, and cost.
 
 ### Document kinds
 
@@ -67,8 +77,10 @@ on install, upgrade, and company creation.
 | Maximum Ledger Entry Count | 100 |
 | Default Document Count | 10 |
 | Maximum Document Count | 20 |
+| Default List Count | 20 |
+| Maximum List Count | 100 |
 
-Assign `BC WEBMCP USER` to users of the FactBox and `BC WEBMCP SETUP` to setup
+Assign `BC WEBMCP USER` to users of the FactBox and `BC WEBMCP ADMIN` to setup
 administrators. These permission sets cover extension-owned objects only. They
 do not grant read or write access to Customer, Vendor, Item, ledger, or document
 tables.
@@ -85,18 +97,18 @@ Browser agent
   -> dynamically registered document.modelContext tools
   -> JavaScript pending-call map
   -> Business Central control add-in event
-  -> generic FactBox RecordId context
+  -> generic FactBox record or filtered-list context
   -> internal BC WebMCP Management dispatcher
-  -> typed Customer / Vendor / Item provider
+  -> typed Customer / Vendor / Item record or list provider
   -> JavaScript completion callback
   -> text-wrapped structured JSON result
 ```
 
-The FactBox is source-table independent. Each host page passes its current
-`RecordId`; tool definitions depend on the table, while execution always
-re-fetches the current database record. The public `BC WebMCP Interface`
-codeunit exposes integration events for other extensions. See
-[Extending BC WebMCP](docs/extending-bc-webmcp.md).
+The FactBox is source-table independent. Card pages pass their current
+`RecordId`. Supported list pages pass the table ID and `GetView(false)` value so
+execution can reapply the current filters and sorting. The public `BC WebMCP
+Interface` codeunit exposes record-context integration events for other
+extensions. See [Extending BC WebMCP](docs/extending-bc-webmcp.md).
 
 ## Build and tests
 
@@ -127,6 +139,10 @@ WebMCP brought into view before its control add-in can register tools. WebMCP is
 experimental, and iframe permission or agent-discovery behaviour can change
 independently of this AL extension. The original browser setup and evidence
 procedure remains in [Manual feasibility testing](docs/manual-feasibility-test.md).
+
+List ranking follows the page's current order. If the response says
+`isLimited: true`, the agent has received only `returnedCount` of `totalCount`
+matching records and must disclose that limitation.
 
 ## License
 

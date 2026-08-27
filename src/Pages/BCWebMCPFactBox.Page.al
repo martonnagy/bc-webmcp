@@ -43,10 +43,13 @@ page 50100 "BC WebMCP FactBox"
                     ResultJson: Text;
                     IsError: Boolean;
                 begin
-                    Management.ExecuteTool(ContextRecordId, ToolName, ArgumentsJson, ResultJson, IsError);
+                    if ListContext then
+                        Management.ExecuteListTool(ContextTableId, ContextView, ToolName, ArgumentsJson, ResultJson, IsError)
+                    else
+                        Management.ExecuteTool(ContextRecordId, ToolName, ArgumentsJson, ResultJson, IsError);
                     CurrPage.WebMCPBridge.CompleteToolCall(RequestId, ResultJson, IsError);
 
-                    if (not IsError) and (ToolName = Management.GetSetLastAccessedToolName()) then begin
+                    if (not ListContext) and (not IsError) and (ToolName = Management.GetSetLastAccessedToolName()) then begin
                         RefreshLastAccessed();
                         CurrPage.Update(false);
                     end;
@@ -57,7 +60,21 @@ page 50100 "BC WebMCP FactBox"
 
     procedure SetContext(NewContextRecordId: RecordId)
     begin
+        ListContext := false;
+        Clear(ContextTableId);
+        Clear(ContextView);
         ContextRecordId := NewContextRecordId;
+        RefreshLastAccessed();
+        RefreshToolDefinitions();
+        CurrPage.Update(false);
+    end;
+
+    procedure SetListContext(NewContextTableId: Integer; NewContextView: Text)
+    begin
+        ListContext := true;
+        Clear(ContextRecordId);
+        ContextTableId := NewContextTableId;
+        ContextView := NewContextView;
         RefreshLastAccessed();
         RefreshToolDefinitions();
         CurrPage.Update(false);
@@ -73,10 +90,16 @@ page 50100 "BC WebMCP FactBox"
         if not BridgeReady then
             exit;
 
-        if not Management.GetToolDefinitions(ContextRecordId, ToolDefinitionsJson, ErrorCode, ErrorMessage) then begin
-            CurrPage.WebMCPBridge.SetToolRegistrationError(ErrorCode, ErrorMessage);
-            exit;
-        end;
+        if ListContext then begin
+            if not Management.GetListToolDefinitions(ContextTableId, ToolDefinitionsJson, ErrorCode, ErrorMessage) then begin
+                CurrPage.WebMCPBridge.SetToolRegistrationError(ErrorCode, ErrorMessage);
+                exit;
+            end;
+        end else
+            if not Management.GetToolDefinitions(ContextRecordId, ToolDefinitionsJson, ErrorCode, ErrorMessage) then begin
+                CurrPage.WebMCPBridge.SetToolRegistrationError(ErrorCode, ErrorMessage);
+                exit;
+            end;
 
         CurrPage.WebMCPBridge.SetToolDefinitions(ToolDefinitionsJson);
     end;
@@ -90,6 +113,11 @@ page 50100 "BC WebMCP FactBox"
         LastAccessedNeverVisible := true;
         LastAccessedNever := 'Never';
 
+        if ListContext then begin
+            LastAccessedNeverVisible := false;
+            exit;
+        end;
+
         if Management.GetLastAccessed(ContextRecordId, LastAccessed) then
             if LastAccessed <> 0DT then begin
                 LastAccessedVisible := true;
@@ -99,9 +127,12 @@ page 50100 "BC WebMCP FactBox"
 
     var
         ContextRecordId: RecordId;
+        ContextTableId: Integer;
+        ContextView: Text;
         LastAccessed: DateTime;
         LastAccessedNever: Text;
         LastAccessedVisible: Boolean;
         LastAccessedNeverVisible: Boolean;
         BridgeReady: Boolean;
+        ListContext: Boolean;
 }

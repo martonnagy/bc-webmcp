@@ -58,6 +58,30 @@ table 50102 "BC WebMCP Setup"
                     Error(MaximumBelowDefaultErr, FieldCaption("Maximum Document Count"), FieldCaption("Default Document Count"));
             end;
         }
+        field(30; "Default List Count"; Integer)
+        {
+            Caption = 'Default List Count';
+            DataClassification = SystemMetadata;
+            MinValue = 1;
+
+            trigger OnValidate()
+            begin
+                if ("Maximum List Count" <> 0) and ("Default List Count" > "Maximum List Count") then
+                    Error(DefaultExceedsMaximumErr, FieldCaption("Default List Count"), FieldCaption("Maximum List Count"));
+            end;
+        }
+        field(31; "Maximum List Count"; Integer)
+        {
+            Caption = 'Maximum List Count';
+            DataClassification = SystemMetadata;
+            MinValue = 1;
+
+            trigger OnValidate()
+            begin
+                if ("Default List Count" <> 0) and ("Maximum List Count" < "Default List Count") then
+                    Error(MaximumBelowDefaultErr, FieldCaption("Maximum List Count"), FieldCaption("Default List Count"));
+            end;
+        }
     }
 
     keys
